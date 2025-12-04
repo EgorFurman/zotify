@@ -682,12 +682,33 @@ class Zotify:
             auth_as_bytes = base64.b64encode(json.dumps(auth_obj, ensure_ascii=True).encode("ascii"))
             cls.SESSION = session_builder.stored(auth_as_bytes).create()
             
+            # Сохраняем credentials в формате совместимом с librespot stored_file()
+            if cls.CONFIG.get_save_credentials():
+                creds_path = cls.CONFIG.get_credentials_location()
+                cls._save_credentials_librespot_format(username, access_token, str(creds_path))
+            
             Printer.hashtaged(PrintChannel.MANDATORY, f"Headless OAuth login successful for user: {username}")
             return True
             
         except Exception as e:
             Printer.hashtaged(PrintChannel.ERROR, f"Headless OAuth failed: {str(e)}")
             return False
+    
+    @classmethod
+    def _save_credentials_librespot_format(cls, username: str, access_token: str, creds_path: str):
+        """
+        Сохранить credentials в формате совместимом с librespot Session.Builder().stored_file().
+        """
+        auth_obj = {
+            "username": username,
+            "credentials": access_token,
+            "type": AuthenticationType.Name(AuthenticationType.AUTHENTICATION_SPOTIFY_TOKEN)
+        }
+        credentials_json = json.dumps(auth_obj, ensure_ascii=True)
+        credentials_b64 = base64.b64encode(credentials_json.encode("ascii")).decode("ascii")
+        
+        with open(creds_path, 'w', encoding='utf-8') as f:
+            json.dump({"credentials": credentials_b64}, f)
     
     @classmethod
     def _exchange_code_for_token(cls, client_id: str, redirect_uri: str, code: str, code_verifier: str) -> dict:
