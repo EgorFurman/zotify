@@ -113,33 +113,18 @@ PLAYLIST_READ_PRIVATE = 'playlist-read-private'
 USER_FOLLOW_READ = 'user-follow-read'
 USER_LIBRARY_READ = 'user-library-read'
 USER_READ_EMAIL = 'user-read-email'
+# Fixed scopes - removed deprecated/invalid ones that cause "Illegal scope" error
 SCOPES = [
-    "app-remote-control",
-    "playlist-modify",
-    "playlist-modify-private",
-    "playlist-modify-public",
-    "playlist-read",
-    "playlist-read-collaborative",
-    "playlist-read-private",
-    "streaming",
-    "ugc-image-upload",
-    "user-follow-modify",
-    "user-follow-read",
-    "user-library-modify",
-    "user-library-read",
-    "user-modify",
-    "user-modify-playback-state",
-    "user-modify-private",
-    "user-personalized",
-    "user-read-birthdate",
-    "user-read-currently-playing",
-    "user-read-email",
-    "user-read-play-history",
-    "user-read-playback-position",
-    "user-read-playback-state",
-    "user-read-private",
-    "user-read-recently-played",
-    "user-top-read",
+    "streaming",                     # Для скачивания аудио
+    "user-library-read",             # Для получения лайкнутых треков
+    "user-library-modify",           # Для модификации библиотеки
+    "user-follow-read",              # Для получения подписок на артистов
+    "playlist-read-private",         # Для приватных плейлистов
+    "playlist-read-collaborative",   # Для совместных плейлистов
+    "user-read-email",               # Для идентификации пользователя
+    "user-read-private",             # Для информации о подписке (Premium)
+    "user-read-playback-state",      # Для состояния воспроизведения
+    "user-read-currently-playing",   # Для текущего трека
 ]
 
 # System Constants
