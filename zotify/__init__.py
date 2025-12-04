@@ -1,4 +1,4 @@
-__version__ = "0.9.31-headless"
+__version__ = "0.9.32"
 
 # Headless OAuth API
 from zotify.headless_auth import (
