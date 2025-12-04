@@ -362,8 +362,18 @@ class Config:
         else:
             credentials_path: str = cls.get(CREDENTIALS_LOCATION)
             if credentials_path[0] == ".":
-                credentials_path = cls.get_root_path() / PurePath(credentials_path).relative_to(".")
-            credentials = PurePath(Path(credentials_path).expanduser() / 'credentials.json')
+                credentials_path = str(cls.get_root_path() / PurePath(credentials_path).relative_to("."))
+            
+            credentials_path = Path(credentials_path).expanduser()
+            
+            # ИСПРАВЛЕНИЕ: Если путь уже заканчивается на .json — используем как есть
+            # Иначе добавляем credentials.json
+            if credentials_path.suffix == '.json':
+                credentials = PurePath(credentials_path)
+            else:
+                credentials = PurePath(credentials_path / 'credentials.json')
+        
+        # Создаём РОДИТЕЛЬСКУЮ директорию, НЕ сам файл
         Path(credentials.parent).mkdir(parents=True, exist_ok=True)
         return credentials
     
