@@ -140,7 +140,7 @@ def handle_generate_auth_url(args):
     from zotify.config import Zotify
     
     client_id = getattr(args, 'client_id', None)
-    redirect_uri = getattr(args, 'oauth_redirect_uri', None)
+    redirect_uri = getattr(args, 'redirect_uri', None)
     
     if not client_id:
         print("Error: --client-id is required for --generate-auth-url")
