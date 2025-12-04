@@ -50,6 +50,12 @@ def main():
                         dest='token',
                         help='Authentication token')
     
+    # Headless OAuth options
+    parser.add_argument('--generate-auth-url',
+                        action='store_true',
+                        dest='generate_auth_url',
+                        help='Generate OAuth URL and code_verifier for headless authentication (requires --client-id and --redirect-uri)')
+    
     parser.add_argument('-ns', '--no-splash',
                         action='store_true',
                         help='Suppress the splash screen when loading')
@@ -115,12 +121,44 @@ def main():
     parser.set_defaults(func=client)
     
     args = parser.parse_args()
+    
+    # Handle --generate-auth-url mode
+    if args.generate_auth_url:
+        handle_generate_auth_url(args)
+        return
+    
     try:
         args.func(args)
     except KeyboardInterrupt:
         print("\n")
         raise
     print("\n")
+
+
+def handle_generate_auth_url(args):
+    """Generate OAuth URL and code_verifier for headless authentication."""
+    from zotify.config import Zotify
+    
+    client_id = getattr(args, 'client_id', None)
+    redirect_uri = getattr(args, 'oauth_redirect_uri', None)
+    
+    if not client_id:
+        print("Error: --client-id is required for --generate-auth-url")
+        return
+    
+    if not redirect_uri:
+        print("Error: --oauth-redirect-uri is required for --generate-auth-url")
+        return
+    
+    oauth_url, code_verifier = Zotify.generate_auth_url(client_id, redirect_uri)
+    
+    print(f"OAuth URL: {oauth_url}")
+    print(f"Code Verifier: {code_verifier}")
+    print("\nInstructions:")
+    print("1. Open the OAuth URL in a browser")
+    print("2. Authorize the application")
+    print("3. Copy the 'code' parameter from the redirect URL")
+    print("4. Use zotify with --auth-code <CODE> --code-verifier <VERIFIER>")
 
 
 if __name__ == '__main__':

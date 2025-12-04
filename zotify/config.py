@@ -98,6 +98,12 @@ CONFIG_VALUES = {
     CHUNK_SIZE:                 { 'default': '20000',                   'type': int,    'arg': ('--chunk-size'                           ,) },
     REDIRECT_ADDRESS:           { 'default': '127.0.0.1',               'type': str,    'arg': ('--redirect-address'                     ,) },
     
+    # Headless OAuth Options
+    CLIENT_ID:                  { 'default': '',                        'type': str,    'arg': ('--client-id'                            ,) },
+    REDIRECT_URI:               { 'default': '',                        'type': str,    'arg': ('--oauth-redirect-uri'                   ,) },
+    AUTH_CODE:                  { 'default': '',                        'type': str,    'arg': ('--auth-code'                            ,) },
+    CODE_VERIFIER:              { 'default': '',                        'type': str,    'arg': ('--code-verifier'                        ,) },
+    
     # Terminal & Logging Options
     PRINT_SPLASH:               { 'default': 'False',                   'type': bool,   'arg': ('--print-splash'                         ,) },
     PRINT_PROGRESS_INFO:        { 'default': 'True',                    'type': bool,   'arg': ('--print-progress-info'                  ,) },
@@ -594,6 +600,10 @@ class Zotify:
             else:
                 session_builder.conf.store_credentials = True
         
+        # Headless OAuth mode: use provided auth_code and code_verifier
+        if cls._try_headless_oauth(args, session_builder):
+            return
+        
         if args.username not in {None, ""} and args.token not in {None, ""}:
             try:
                 auth_obj = {"username": args.username,
@@ -608,11 +618,121 @@ class Zotify:
         def oauth_print(url):
             Printer.new_print(PrintChannel.MANDATORY, f"Click on the following link to login:\n{url}")
         
+        # Use custom client_id and redirect_uri if provided
+        client_id = cls.CONFIG.get(CLIENT_ID) or MercuryRequests.keymaster_client_id
         port = 4381
-        redirect_url = f"http://{cls.CONFIG.get_oauth_address()}:{port}/login"
-        session_builder.login_credentials = OAuth(MercuryRequests.keymaster_client_id, redirect_url, oauth_print).flow()
+        redirect_url = cls.CONFIG.get(REDIRECT_URI) or f"http://{cls.CONFIG.get_oauth_address()}:{port}/login"
+        
+        session_builder.login_credentials = OAuth(client_id, redirect_url, oauth_print).flow()
         cls.SESSION = session_builder.create()
         return
+    
+    @classmethod
+    def _try_headless_oauth(cls, args, session_builder) -> bool:
+        """
+        Attempt headless OAuth login using auth_code and code_verifier.
+        Returns True if successful, False otherwise.
+        """
+        auth_code = cls.CONFIG.get(AUTH_CODE)
+        code_verifier = cls.CONFIG.get(CODE_VERIFIER)
+        client_id = cls.CONFIG.get(CLIENT_ID)
+        redirect_uri = cls.CONFIG.get(REDIRECT_URI)
+        
+        if not (auth_code and code_verifier):
+            return False
+        
+        if not client_id:
+            Printer.hashtaged(PrintChannel.ERROR, "Headless OAuth requires --client-id")
+            return False
+        
+        if not redirect_uri:
+            Printer.hashtaged(PrintChannel.ERROR, "Headless OAuth requires --redirect-uri")
+            return False
+        
+        try:
+            # Exchange authorization code for access token
+            token_data = cls._exchange_code_for_token(client_id, redirect_uri, auth_code, code_verifier)
+            
+            if 'error' in token_data:
+                Printer.hashtaged(PrintChannel.ERROR, f"Token exchange failed: {token_data.get('error_description', token_data['error'])}")
+                return False
+            
+            # Create credentials from token
+            access_token = token_data['access_token']
+            
+            # Use the access token to get user info and create session
+            user_info = cls._get_user_info(access_token)
+            username = user_info.get('id', user_info.get('email', 'unknown'))
+            
+            auth_obj = {
+                "username": username,
+                "credentials": access_token,
+                "type": AuthenticationType.keys()[1]
+            }
+            auth_as_bytes = base64.b64encode(json.dumps(auth_obj, ensure_ascii=True).encode("ascii"))
+            cls.SESSION = session_builder.stored(auth_as_bytes).create()
+            
+            Printer.hashtaged(PrintChannel.MANDATORY, f"Headless OAuth login successful for user: {username}")
+            return True
+            
+        except Exception as e:
+            Printer.hashtaged(PrintChannel.ERROR, f"Headless OAuth failed: {str(e)}")
+            return False
+    
+    @classmethod
+    def _exchange_code_for_token(cls, client_id: str, redirect_uri: str, code: str, code_verifier: str) -> dict:
+        """Exchange authorization code for access token using PKCE."""
+        token_url = "https://accounts.spotify.com/api/token"
+        
+        data = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': redirect_uri,
+            'client_id': client_id,
+            'code_verifier': code_verifier
+        }
+        
+        response = requests.post(token_url, data=data)
+        return response.json()
+    
+    @classmethod
+    def _get_user_info(cls, access_token: str) -> dict:
+        """Get user info using access token."""
+        headers = {'Authorization': f'Bearer {access_token}'}
+        response = requests.get('https://api.spotify.com/v1/me', headers=headers)
+        return response.json()
+    
+    @classmethod
+    def generate_auth_url(cls, client_id: str, redirect_uri: str) -> tuple[str, str]:
+        """
+        Generate OAuth URL and code_verifier for headless authentication.
+        Returns (oauth_url, code_verifier)
+        """
+        import hashlib
+        import secrets
+        
+        # Generate code_verifier (43-128 characters)
+        code_verifier = secrets.token_urlsafe(64)
+        
+        # Generate code_challenge from code_verifier
+        code_challenge = base64.urlsafe_b64encode(
+            hashlib.sha256(code_verifier.encode()).digest()
+        ).decode().rstrip('=')
+        
+        # Build OAuth URL
+        params = {
+            'client_id': client_id,
+            'response_type': 'code',
+            'redirect_uri': redirect_uri,
+            'code_challenge_method': 'S256',
+            'code_challenge': code_challenge,
+            'scope': ' '.join(SCOPES)
+        }
+        
+        from urllib.parse import urlencode
+        oauth_url = f"https://accounts.spotify.com/authorize?{urlencode(params)}"
+        
+        return oauth_url, code_verifier
     
     @classmethod
     def get_content_stream(cls, content_id, quality):

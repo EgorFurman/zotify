@@ -78,6 +78,7 @@ If an artist's URL is given, all albums by the specified artist will be download
 | `-c`, `--config-location`          | Specify a directory containing a Zotify `config.json` file to load settings (Also accepts a filepath to a `.json` file) |
 | `-u`, `--username`                 | Account username                                                                                                        |
 | `--token`                          | Authentication token                                                                                                    |
+| `--generate-auth-url`              | Generate OAuth URL and code_verifier for headless authentication (requires `--client-id` and `--oauth-redirect-uri`)    |
 | `--debug`                          | Enable debug mode, prints extra information and creates a `config_DEBUG.json` file                                      |
 | `--update-config`                  | Updates the `config.json` file while keeping all current settings unchanged                                             |
 
@@ -175,8 +176,14 @@ Set arguments in the commandline like this: `-ie False` or `--codec mp3`. Wrap c
 |------------------------------|-------------------------------------|------------------------------------------------------------------------------|---------------------------|
 | `RETRY_ATTEMPTS`             | `--retry-attempts`                  | Number of times to retry failed API requests                                 | 1                         |
 | `CHUNK_SIZE`                 | `--chunk-size`                      | Chunk size for downloading                                                   | 20000                     |
-| `OAUTH_ADDRESS`              | `--redirect-uri`                    | Local server address listening for OAuth login requests                      | 0.0.0.0                   |
 | `REDIRECT_ADDRESS`           | `--redirect-address`                | Local callback point for OAuth login requests                                | 127.0.0.1                 |
+
+| Headless OAuth Options       | Command Line Config Flag            | Description                                                                  | Default Value             |
+|------------------------------|-------------------------------------|------------------------------------------------------------------------------|---------------------------|
+| `CLIENT_ID`                  | `--client-id`                       | Spotify App Client ID for custom OAuth                                       | `""`                      |
+| `REDIRECT_URI`               | `--oauth-redirect-uri`              | Custom redirect URI for headless OAuth                                       | `""`                      |
+| `AUTH_CODE`                  | `--auth-code`                       | Authorization code from Spotify callback for headless login                  | `""`                      |
+| `CODE_VERIFIER`              | `--code-verifier`                   | PKCE code verifier for headless OAuth token exchange                         | `""`                      |
 
 | Terminal & Logging Options   | Command Line Config Flag            | Description                                                                  | Default Value             |
 |------------------------------|-------------------------------------|------------------------------------------------------------------------------|---------------------------|
@@ -266,6 +273,57 @@ You can add multiple patterns into a single regex by chaining the "or" construct
 ### Example Regex Values
 
 Check for Live Performances   :   `^.*?\\(?(?:Live|Live (?:from|in|at) .*?)\\)?$`
+
+## Headless OAuth (Server-Side Authentication)
+
+For server deployments (e.g., Telegram bots) where browser-based login is not possible, Zotify supports headless OAuth authentication using PKCE flow.
+
+<details><summary>
+
+### Headless OAuth Usage
+
+</summary>
+
+**Step 1: Generate OAuth URL**
+
+```bash
+zotify --generate-auth-url --client-id <CLIENT_ID> --oauth-redirect-uri <REDIRECT_URI>
+```
+
+This outputs an OAuth URL and a code_verifier. Save the code_verifier — it's required for the next step.
+
+**Step 2: User Authorization**
+
+Direct the user to open the OAuth URL in their browser. After authorization, Spotify redirects to your `redirect_uri` with a `?code=` parameter.
+
+**Step 3: Exchange Code for Credentials**
+
+```bash
+zotify --client-id <CLIENT_ID> \
+       --oauth-redirect-uri <REDIRECT_URI> \
+       --auth-code <CODE_FROM_CALLBACK> \
+       --code-verifier <SAVED_VERIFIER> \
+       --credentials-location ./credentials.json \
+       <SPOTIFY_URL>
+```
+
+**Subsequent Downloads**
+
+Once credentials are saved, use them directly:
+
+```bash
+zotify --credentials-location ./credentials.json <SPOTIFY_URL>
+```
+
+**Setup Requirements**
+
+1. Create an app at [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+2. Add your redirect URI in the app settings
+3. Copy the Client ID
+
+For detailed integration examples, see [docs/ZOTIFY_HEADLESS_OAUTH_TUTORIAL.md](docs/ZOTIFY_HEADLESS_OAUTH_TUTORIAL.md)
+
+</details>
 
 ## Docker Usage
 
