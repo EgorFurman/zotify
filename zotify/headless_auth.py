@@ -157,11 +157,14 @@ class ZotifyCredentials:
         credentials_path = Path(path)
         credentials_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Create credentials in librespot format - direct JSON, no base64 wrapper
+        # ВАЖНО: access_token должен быть в base64!
+        # librespot делает base64.b64decode(credentials) при чтении
+        credentials_b64 = base64.b64encode(self.access_token.encode()).decode()
+        
         creds_data = {
             "username": self.username,
-            "credentials": self.access_token,
-            "type": "AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS"
+            "credentials": credentials_b64,
+            "type": "AUTHENTICATION_SPOTIFY_TOKEN"
         }
         
         with open(credentials_path, 'w') as f:
@@ -171,7 +174,7 @@ class ZotifyCredentials:
     def load(cls, path: str) -> 'ZotifyCredentials':
         """
         Load credentials from a JSON file.
-        Supports both new format (direct JSON) and legacy format (base64 wrapped).
+        Supports current format (credentials in base64) and legacy format.
         
         Args:
             path: Path to the credentials file
@@ -182,14 +185,16 @@ class ZotifyCredentials:
         with open(path, 'r') as f:
             data = json.load(f)
         
-        # New format: direct JSON with username, credentials, type
+        # Current format: username, credentials (base64), type
         if 'username' in data and 'credentials' in data and 'type' in data:
+            # Decode base64 credentials
+            access_token = base64.b64decode(data['credentials']).decode()
             return cls(
                 username=data.get('username', 'unknown'),
-                access_token=data.get('credentials', '')
+                access_token=access_token
             )
         
-        # Legacy format: base64 wrapped
+        # Legacy format: base64 wrapped entire object
         if 'credentials' in data and 'username' not in data:
             decoded = json.loads(base64.b64decode(data['credentials']).decode('ascii'))
             return cls(

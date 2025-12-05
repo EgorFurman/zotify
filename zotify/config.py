@@ -704,12 +704,14 @@ class Zotify:
     def _save_credentials_librespot_format(cls, username: str, access_token: str, creds_path: str):
         """
         Сохранить credentials в формате совместимом с librespot Session.Builder().stored_file().
-        Формат: прямой JSON без base64 обёртки.
+        ВАЖНО: access_token должен быть в base64, т.к. librespot делает b64decode при чтении.
         """
+        credentials_b64 = base64.b64encode(access_token.encode()).decode()
+        
         creds_data = {
             "username": username,
-            "credentials": access_token,
-            "type": "AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS"
+            "credentials": credentials_b64,
+            "type": "AUTHENTICATION_SPOTIFY_TOKEN"
         }
         
         with open(creds_path, 'w', encoding='utf-8') as f:
