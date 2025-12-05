@@ -6,6 +6,7 @@ Provides Python API for server-side authentication without browser interaction.
 import base64
 import hashlib
 import json
+import os
 import secrets
 from pathlib import Path
 from urllib.parse import urlencode
@@ -31,17 +32,34 @@ class ZotifyAuth:
         # After receiving the authorization code
         credentials = auth.exchange_code(code='AQD...', code_verifier=code_verifier)
         credentials.save('/path/to/credentials.json')
+        
+        # With proxy support
+        auth = ZotifyAuth(
+            client_id='your_client_id',
+            redirect_uri='https://mybot.com/callback',
+            proxy='http://user:pass@host:port'
+        )
     """
     
     TOKEN_URL = "https://accounts.spotify.com/api/token"
     AUTH_URL = "https://accounts.spotify.com/authorize"
     USER_URL = "https://api.spotify.com/v1/me"
     
-    def __init__(self, client_id: str, redirect_uri: str):
+    def __init__(self, client_id: str, redirect_uri: str, proxy: str = None):
         self.client_id = client_id
         self.redirect_uri = redirect_uri
         self.code_verifier = None
         self._code_challenge = None
+        
+        # Proxy support: explicit param or environment variables
+        self.proxies = None
+        if proxy:
+            self.proxies = {"http": proxy, "https": proxy}
+        elif os.getenv('HTTPS_PROXY'):
+            self.proxies = {
+                "http": os.getenv('HTTP_PROXY'),
+                "https": os.getenv('HTTPS_PROXY')
+            }
     
     def _generate_pkce(self) -> tuple[str, str]:
         """Generate PKCE code_verifier and code_challenge."""
@@ -99,7 +117,7 @@ class ZotifyAuth:
             'code_verifier': verifier
         }
         
-        response = requests.post(self.TOKEN_URL, data=data)
+        response = requests.post(self.TOKEN_URL, data=data, proxies=self.proxies, timeout=30)
         token_data = response.json()
         
         if 'error' in token_data:
@@ -109,7 +127,7 @@ class ZotifyAuth:
         
         # Get user info
         headers = {'Authorization': f'Bearer {token_data["access_token"]}'}
-        user_response = requests.get(self.USER_URL, headers=headers)
+        user_response = requests.get(self.USER_URL, headers=headers, proxies=self.proxies, timeout=30)
         user_data = user_response.json()
         
         return ZotifyCredentials(
@@ -136,16 +154,15 @@ class ZotifyCredentials:
         Args:
             path: Path to save the credentials file
         """
-        from librespot.proto.Authentication_pb2 import AuthenticationType
-        
         credentials_path = Path(path)
         credentials_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Create credentials in librespot format
+        # Use explicit type string instead of AuthenticationType.keys()[1] for reliability
         auth_obj = {
             "username": self.username,
             "credentials": self.access_token,
-            "type": AuthenticationType.keys()[1]
+            "type": "AUTHENTICATION_SPOTIFY_TOKEN"
         }
         
         encoded = base64.b64encode(

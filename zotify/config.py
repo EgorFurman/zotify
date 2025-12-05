@@ -4,6 +4,7 @@ import json
 import base64
 import sys
 import re
+import os
 import requests
 from librespot.audio.decoders import VorbisOnlyAudioQuality
 from librespot.core import Session, OAuth
@@ -642,6 +643,7 @@ class Zotify:
         """
         Attempt headless OAuth login using auth_code and code_verifier.
         Returns True if successful, False otherwise.
+        Exits with code 1 on errors to prevent fallback to interactive mode.
         """
         auth_code = cls.CONFIG.get(AUTH_CODE)
         code_verifier = cls.CONFIG.get(CODE_VERIFIER)
@@ -653,19 +655,20 @@ class Zotify:
         
         if not client_id:
             Printer.hashtaged(PrintChannel.ERROR, "Headless OAuth requires --client-id")
-            return False
+            sys.exit(1)
         
         if not redirect_uri:
-            Printer.hashtaged(PrintChannel.ERROR, "Headless OAuth requires --redirect-uri")
-            return False
+            Printer.hashtaged(PrintChannel.ERROR, "Headless OAuth requires --oauth-redirect-uri")
+            sys.exit(1)
         
         try:
             # Exchange authorization code for access token
             token_data = cls._exchange_code_for_token(client_id, redirect_uri, auth_code, code_verifier)
             
             if 'error' in token_data:
-                Printer.hashtaged(PrintChannel.ERROR, f"Token exchange failed: {token_data.get('error_description', token_data['error'])}")
-                return False
+                error_msg = token_data.get('error_description', token_data['error'])
+                Printer.hashtaged(PrintChannel.ERROR, f"Token exchange failed: {error_msg}")
+                sys.exit(1)
             
             # Create credentials from token
             access_token = token_data['access_token']
@@ -690,9 +693,12 @@ class Zotify:
             Printer.hashtaged(PrintChannel.MANDATORY, f"Headless OAuth login successful for user: {username}")
             return True
             
+        except requests.exceptions.RequestException as e:
+            Printer.hashtaged(PrintChannel.ERROR, f"Network error during OAuth: {e}")
+            sys.exit(1)
         except Exception as e:
             Printer.hashtaged(PrintChannel.ERROR, f"Headless OAuth failed: {str(e)}")
-            return False
+            sys.exit(1)
     
     @classmethod
     def _save_credentials_librespot_format(cls, username: str, access_token: str, creds_path: str):
@@ -711,6 +717,16 @@ class Zotify:
             json.dump({"credentials": credentials_b64}, f)
     
     @classmethod
+    def _get_proxies(cls) -> dict | None:
+        """Get proxy settings from environment variables."""
+        if os.getenv('HTTPS_PROXY'):
+            return {
+                'http': os.getenv('HTTP_PROXY'),
+                'https': os.getenv('HTTPS_PROXY')
+            }
+        return None
+    
+    @classmethod
     def _exchange_code_for_token(cls, client_id: str, redirect_uri: str, code: str, code_verifier: str) -> dict:
         """Exchange authorization code for access token using PKCE."""
         token_url = "https://accounts.spotify.com/api/token"
@@ -723,14 +739,14 @@ class Zotify:
             'code_verifier': code_verifier
         }
         
-        response = requests.post(token_url, data=data)
+        response = requests.post(token_url, data=data, proxies=cls._get_proxies(), timeout=30)
         return response.json()
     
     @classmethod
     def _get_user_info(cls, access_token: str) -> dict:
         """Get user info using access token."""
         headers = {'Authorization': f'Bearer {access_token}'}
-        response = requests.get('https://api.spotify.com/v1/me', headers=headers)
+        response = requests.get('https://api.spotify.com/v1/me', headers=headers, proxies=cls._get_proxies(), timeout=30)
         return response.json()
     
     @classmethod
