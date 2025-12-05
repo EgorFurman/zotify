@@ -704,17 +704,16 @@ class Zotify:
     def _save_credentials_librespot_format(cls, username: str, access_token: str, creds_path: str):
         """
         Сохранить credentials в формате совместимом с librespot Session.Builder().stored_file().
+        Формат: прямой JSON без base64 обёртки.
         """
-        auth_obj = {
+        creds_data = {
             "username": username,
             "credentials": access_token,
-            "type": AuthenticationType.Name(AuthenticationType.AUTHENTICATION_SPOTIFY_TOKEN)
+            "type": "AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS"
         }
-        credentials_json = json.dumps(auth_obj, ensure_ascii=True)
-        credentials_b64 = base64.b64encode(credentials_json.encode("ascii")).decode("ascii")
         
         with open(creds_path, 'w', encoding='utf-8') as f:
-            json.dump({"credentials": credentials_b64}, f)
+            json.dump(creds_data, f)
     
     @classmethod
     def _get_proxies(cls) -> dict | None:

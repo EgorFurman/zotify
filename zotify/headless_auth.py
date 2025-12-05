@@ -149,7 +149,7 @@ class ZotifyCredentials:
     
     def save(self, path: str) -> None:
         """
-        Save credentials to a JSON file compatible with Zotify.
+        Save credentials to a JSON file compatible with Zotify/librespot.
         
         Args:
             path: Path to save the credentials file
@@ -157,25 +157,21 @@ class ZotifyCredentials:
         credentials_path = Path(path)
         credentials_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Create credentials in librespot format
-        # Use explicit type string instead of AuthenticationType.keys()[1] for reliability
-        auth_obj = {
+        # Create credentials in librespot format - direct JSON, no base64 wrapper
+        creds_data = {
             "username": self.username,
             "credentials": self.access_token,
-            "type": "AUTHENTICATION_SPOTIFY_TOKEN"
+            "type": "AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS"
         }
         
-        encoded = base64.b64encode(
-            json.dumps(auth_obj, ensure_ascii=True).encode("ascii")
-        ).decode("ascii")
-        
         with open(credentials_path, 'w') as f:
-            json.dump({"credentials": encoded}, f)
+            json.dump(creds_data, f)
     
     @classmethod
     def load(cls, path: str) -> 'ZotifyCredentials':
         """
         Load credentials from a JSON file.
+        Supports both new format (direct JSON) and legacy format (base64 wrapped).
         
         Args:
             path: Path to the credentials file
@@ -186,7 +182,15 @@ class ZotifyCredentials:
         with open(path, 'r') as f:
             data = json.load(f)
         
-        if 'credentials' in data:
+        # New format: direct JSON with username, credentials, type
+        if 'username' in data and 'credentials' in data and 'type' in data:
+            return cls(
+                username=data.get('username', 'unknown'),
+                access_token=data.get('credentials', '')
+            )
+        
+        # Legacy format: base64 wrapped
+        if 'credentials' in data and 'username' not in data:
             decoded = json.loads(base64.b64decode(data['credentials']).decode('ascii'))
             return cls(
                 username=decoded.get('username', 'unknown'),
