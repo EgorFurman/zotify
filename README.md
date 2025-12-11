@@ -177,6 +177,7 @@ Set arguments in the commandline like this: `-ie False` or `--codec mp3`. Wrap c
 | `RETRY_ATTEMPTS`             | `--retry-attempts`                  | Number of times to retry failed API requests                                 | 1                         |
 | `CHUNK_SIZE`                 | `--chunk-size`                      | Chunk size for downloading                                                   | 20000                     |
 | `REDIRECT_ADDRESS`           | `--redirect-address`                | Local callback point for OAuth login requests                                | 127.0.0.1                 |
+| `PROXY_URL`                  | `--proxy-url`                       | SOCKS5 proxy URL (e.g., `socks5h://user:pass@host:port`)                     | `""`                      |
 
 | Headless OAuth Options       | Command Line Config Flag            | Description                                                                  | Default Value             |
 |------------------------------|-------------------------------------|------------------------------------------------------------------------------|---------------------------|
@@ -324,6 +325,26 @@ zotify --credentials-location ./credentials.json <SPOTIFY_URL>
 For detailed integration examples, see [docs/ZOTIFY_HEADLESS_OAUTH_TUTORIAL.md](docs/ZOTIFY_HEADLESS_OAUTH_TUTORIAL.md)
 
 </details>
+
+## SOCKS5 Proxy Support
+
+Zotify supports SOCKS5 proxy for bypassing geo-restrictions. Use `socks5h://` protocol for remote DNS resolution (recommended).
+
+**Command line:**
+
+```bash
+zotify --proxy-url "socks5h://user:pass@host:port" <SPOTIFY_URL>
+```
+
+**Config file (`config.json`):**
+
+```json
+{
+  "PROXY_URL": "socks5h://user:pass@host:port"
+}
+```
+
+**Note:** Requires `pysocks` package (installed automatically with Zotify).
 
 ## Docker Usage
 

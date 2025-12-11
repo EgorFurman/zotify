@@ -98,6 +98,7 @@ CONFIG_VALUES = {
     RETRY_ATTEMPTS:             { 'default': '1',                       'type': int,    'arg': ('--retry-attempts'                       ,) },
     CHUNK_SIZE:                 { 'default': '20000',                   'type': int,    'arg': ('--chunk-size'                           ,) },
     REDIRECT_ADDRESS:           { 'default': '127.0.0.1',               'type': str,    'arg': ('--redirect-address'                     ,) },
+    PROXY_URL:                  { 'default': '',                        'type': str,    'arg': ('--proxy-url'                            ,) },
     
     # Headless OAuth Options
     CLIENT_ID:                  { 'default': '',                        'type': str,    'arg': ('--client-id'                            ,) },
@@ -580,6 +581,10 @@ class Config:
     @classmethod
     def get_strict_library_verify(cls) -> bool:
         return cls.get(STRICT_LIBRARY_VERIFY)
+    
+    @classmethod
+    def get_proxy_url(cls) -> str:
+        return cls.get(PROXY_URL)
 
 
 class Zotify:    
@@ -596,17 +601,33 @@ class Zotify:
         Printer.debug("Session Initialized Successfully")
     
     @classmethod
+    def _build_session_config(cls) -> Session.Configuration:
+        """Build Session.Configuration with proxy support if configured."""
+        proxy_url = cls.CONFIG.get_proxy_url()
+        if proxy_url:
+            return Session.Configuration.Builder().set_proxy_url(proxy_url).build()
+        return None
+    
+    @classmethod
     def login(cls, args):
         """ Authenticates and saves credentials to a file """
         
         session_builder = Session.Builder() # stored_credentials_file == True by default
         session_builder.conf.store_credentials = False
         
+        # Apply proxy configuration if set
+        session_conf = cls._build_session_config()
+        if session_conf:
+            session_builder.set_conf(session_conf)
+        
         if Zotify.CONFIG.get_save_credentials():
             creds = cls.CONFIG.get_credentials_location()
             session_builder.conf.stored_credentials_file = str(creds)
             if creds and Path(creds).exists():
-                cls.SESSION = Session.Builder().stored_file(creds).create()
+                builder = Session.Builder()
+                if session_conf:
+                    builder.set_conf(session_conf)
+                cls.SESSION = builder.stored_file(creds).create()
                 return
             else:
                 session_builder.conf.store_credentials = True

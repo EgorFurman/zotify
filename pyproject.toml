@@ -22,11 +22,12 @@ classifiers = [
   "Operating System :: OS Independent"
 ]
 dependencies = [
-  "librespot @ git+https://github.com/kokarare1212/librespot-python.git",
+  "librespot @ git+https://github.com/EgorFurman/librespot-python.git",
   "ffmpy",
   "music_tag",
   "Pillow",
   "pkce",
+  "pysocks",
   "protobuf==3.20.1",
   "pwinput",
   "tabulate[widechars]",

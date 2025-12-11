@@ -1,8 +1,9 @@
 ffmpy
-git+https://github.com/kokarare1212/librespot-python.git
+git+https://github.com/EgorFurman/librespot-python.git
 music_tag
 Pillow
 pkce
+pysocks
 protobuf
 pwinput
 tabulate[widechars]
