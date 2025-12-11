@@ -618,7 +618,7 @@ class Zotify:
         # Apply proxy configuration if set
         session_conf = cls._build_session_config()
         if session_conf:
-            session_builder.set_conf(session_conf)
+            session_builder.conf = session_conf
         
         if Zotify.CONFIG.get_save_credentials():
             creds = cls.CONFIG.get_credentials_location()
@@ -626,7 +626,7 @@ class Zotify:
             if creds and Path(creds).exists():
                 builder = Session.Builder()
                 if session_conf:
-                    builder.set_conf(session_conf)
+                    builder.conf = session_conf
                 cls.SESSION = builder.stored_file(creds).create()
                 return
             else:
